@@ -1,0 +1,6 @@
+services:
+  ashdi-downloader:
+    image: ashdi-download
+    volumes:
+      - ./downloads:/app/downloads
+    tty: true

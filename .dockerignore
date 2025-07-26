@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.pyo
+
+*.log
+*.tmp
+*.swp
+.DS_Store
+
+downloads/
+.cache/
+node_modules/
+.vscode/
+
+.git
+.gitignore
