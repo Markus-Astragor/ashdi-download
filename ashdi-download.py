@@ -12,6 +12,15 @@ from bs4 import BeautifulSoup
 from ffmpeg.asyncio import FFmpeg
 from playwright.async_api import async_playwright
 
+DEBUG_ENABLED = False
+
+def set_debug(enabled: bool) -> None:
+    global DEBUG_ENABLED
+    DEBUG_ENABLED = enabled
+
+def logger(message: str) -> None:
+    if DEBUG_ENABLED:
+        print(message)
 
 @click.command()
 @optgroup.group(cls=RequiredMutuallyExclusiveOptionGroup)
@@ -19,17 +28,20 @@ from playwright.async_api import async_playwright
 @optgroup.option("-s", "--season", metavar="URL", multiple=True)
 @click.option("-q", "--quality", type=int)
 @click.option("-o", "--output-format", default="mp4")
+@click.option("--debug", is_flag=True, default=False, help="Enable debug logging")
 async def cli(
     episode: list[str] | None,
     season: list[str] | None,
     quality: int,
     output_format: str,
+    debug: bool = False
 ) -> None:
+    set_debug(debug)
     if episode:
-        print(f"Starting download of episodes: {episode}")
+        logger(f"Starting download of episodes: {episode}")
         await download_multiple(download_episode, episode, quality, output_format)
     elif season:
-        print(f"Starting download of seasons: {season}")
+        logger(f"Starting download of seasons: {season}")
         await download_multiple(download_season, season, quality, output_format)
 
 
@@ -60,27 +72,29 @@ async def download_multiple(
 
 
 async def get_player_url(url: str, *, session: ClientSession = None) -> str | None:
-    print(f"Fetching player URL (with JS) from: {url}")
+    logger(f"Fetching player URL (with JS) from: {url}")
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
 
         await page.goto(url, wait_until="networkidle")
 
+        html = await page.content()
+
         iframe_element = await page.query_selector("iframe[src*='ashdi.vip']")
         if iframe_element:
             src = await iframe_element.get_attribute("src")
-            print(f"Found iframe with src: {src}")
+            logger(f"Found iframe with src: {src}")
             await browser.close()
             return src
-        
-        print("Iframe with ashdi.vip not found.")
+
+        logger("Iframe with ashdi.vip not found.")
         await browser.close()
         return None
 
 
 async def get_quality_url(url: str, *, session: ClientSession) -> str:
-    print(f"Fetching quality URL from: {url}")
+    logger(f"Fetching quality URL from: {url}")
     async with session.get(url) as response:
         text = await response.text()
 
@@ -88,12 +102,12 @@ async def get_quality_url(url: str, *, session: ClientSession) -> str:
     pattern = re.compile(r'file:.*"(.*ashdi\.vip.*)"')
     tag = bs.find("script", string=pattern)
     quality_url = re.search(pattern, tag.text).group(1)
-    print(f"Found quality URL: {quality_url}")
+    logger(f"Found quality URL: {quality_url}")
     return quality_url
 
 
 async def get_episode_url(url: str, quality: int, *, session: ClientSession) -> str:
-    print(f"Fetching episode URL from: {url} with quality: {quality}")
+    logger(f"Fetching episode URL from: {url} with quality: {quality}")
     async with session.get(url) as response:
         text = await response.text()
 
@@ -102,7 +116,7 @@ async def get_episode_url(url: str, quality: int, *, session: ClientSession) -> 
     if quality:
         begin, _, end = url_line.rsplit("/", 2)
         url_line = "/".join([begin, str(quality), end])
-    print(f"Final episode URL: {url_line}")
+    logger(f"Final episode URL: {url_line}")
     return url_line
 
 
@@ -110,40 +124,40 @@ async def download_playlist(url: str, output_format: str) -> None:
     _, name, _, _, _ = url.rsplit("/", 4)
     os.makedirs("downloads", exist_ok=True)
     output = f"downloads/{name}.{output_format}"
-    print(f"Downloading playlist from {url} to {output}")
+    logger(f"Downloading playlist from {url} to {output}")
     ffmpeg = FFmpeg().option("y").option("nostdin").input(url).output(output, c="copy")
     await ffmpeg.execute()
-    print(f"Download completed: {output}")
+    logger(f"Download completed: {output}")
 
 
 async def download_episode(
     url: str, quality: int, output_format: str, *, session: ClientSession
 ) -> None:
     with suppress(ClientError):
-        print(f"Starting episode download: {url}")
+        logger(f"Starting episode download: {url}")
         if player_url := await get_player_url(url, session=session):
             quality_url = await get_quality_url(player_url, session=session)
             episode_url = await get_episode_url(quality_url, quality, session=session)
             await download_playlist(episode_url, output_format)
         else:
-            print(f"Failed to find player URL for episode: {url}")
+            logger(f"Failed to find player URL for episode: {url}")
 
 
 async def get_sub_urls(url: str, *, session: ClientSession) -> list[str]:
-    print(f"Fetching sub URLs for season: {url}")
+    logger(f"Fetching sub URLs for season: {url}")
     async with session.get(url) as response:
         text = await response.text()
 
     bs = BeautifulSoup(text, "html.parser")
     urls = [tag["href"] for tag in bs.find_all("a", href=lambda v: v.startswith(url))]
-    print(f"Found sub URLs: {urls}")
+    logger(f"Found sub URLs: {urls}")
     return urls
 
 
 async def download_season(
     url: str, quality: int, output_format: str, *, session: ClientSession
 ) -> None:
-    print(f"Starting season download: {url}")
+    logger(f"Starting season download: {url}")
     urls = await get_sub_urls(url, session=session)
     await download_multiple(
         download_episode, urls, quality, output_format, session=session
