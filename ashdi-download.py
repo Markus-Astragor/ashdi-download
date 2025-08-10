@@ -15,7 +15,7 @@ from playwright.async_api import async_playwright
 DEBUG_ENABLED = False
 BROWSER_ENABLED = False
 
-def set_globals(enabled_debug: bool, enabled_browser: bool) -> None:
+def set_globals(enabled_debug: bool = False, enabled_browser: bool = False) -> None:
     global DEBUG_ENABLED
     global BROWSER_ENABLED
     DEBUG_ENABLED = enabled_debug
@@ -39,7 +39,7 @@ async def cli(
     quality: int,
     output_format: str,
     debug: bool = False,
-    browser: bool = False
+    browser: bool = False,
 ) -> None:
     set_globals(debug, browser)
 

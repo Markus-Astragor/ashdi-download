@@ -1,6 +1,8 @@
 services:
   ashdi-downloader:
     image: ashdi-download
+    ports:
+      - "5900:5900" 
     volumes:
       - ./downloads:/app/downloads
     tty: true
