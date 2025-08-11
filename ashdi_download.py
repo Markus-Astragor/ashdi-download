@@ -12,18 +12,18 @@ from bs4 import BeautifulSoup
 from ffmpeg.asyncio import FFmpeg
 from playwright.async_api import async_playwright
 
-DEBUG_ENABLED = False
-BROWSER_ENABLED = False
+from download_survey import user_survey
+from utils import logger, set_debug
 
-def set_globals(enabled_debug: bool = False, enabled_browser: bool = False) -> None:
-    global DEBUG_ENABLED
-    global BROWSER_ENABLED
-    DEBUG_ENABLED = enabled_debug
-    BROWSER_ENABLED = enabled_browser
+# DEBUG_ENABLED = False
 
-def logger(message: str) -> None:
-    if DEBUG_ENABLED:
-        print(message)
+# def set_debug(enabled: bool) -> None:
+#     global DEBUG_ENABLED
+#     DEBUG_ENABLED = enabled
+
+# def logger(message: str) -> None:
+#     if DEBUG_ENABLED:
+#         print(message)
 
 @click.command()
 @optgroup.group(cls=RequiredMutuallyExclusiveOptionGroup)
@@ -32,17 +32,14 @@ def logger(message: str) -> None:
 @click.option("-q", "--quality", type=int)
 @click.option("-o", "--output-format", default="mp4")
 @click.option("--debug", is_flag=True, default=False, help="Enable debug logging")
-@click.option("--browser", is_flag=True, default=False, help="Open browser for manual selection")
 async def cli(
     episode: list[str] | None,
     season: list[str] | None,
     quality: int,
     output_format: str,
-    debug: bool = False,
-    browser: bool = False,
+    debug: bool = False
 ) -> None:
-    set_globals(debug, browser)
-
+    set_debug(debug)
     if episode:
         logger(f"Starting download of episodes: {episode}")
         await download_multiple(download_episode, episode, quality, output_format)
@@ -80,24 +77,26 @@ async def download_multiple(
 async def get_player_url(url: str, *, session: ClientSession = None) -> str | None:
     logger(f"Fetching player URL (with JS) from: {url}")
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=not BROWSER_ENABLED)
+        browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
 
         await page.goto(url, wait_until="networkidle")
 
-        if BROWSER_ENABLED:
-            print("Use browser to select series or voice team you prefer")
-            input("Press Enter to continue after making your selection...")
+        # html = await page.content()
+        # elements = await page.query_selector_all(".playlists-items")
+        
+        await user_survey(browser, page)
 
-        iframe_element = await page.query_selector("iframe[src*='ashdi.vip']")
-        if iframe_element:
-            src = await iframe_element.get_attribute("src")
-            logger(f"Found iframe with src: {src}")
-            await browser.close()
-            return src
 
-        logger("Iframe with ashdi.vip not found.")
-        await browser.close()
+        # iframe_element = await page.query_selector("iframe[src*='ashdi.vip']")
+        # if iframe_element:
+        #     src = await iframe_element.get_attribute("src")
+        #     logger(f"Found iframe with src: {src}")
+        #     await browser.close()
+        #     return src
+
+        # logger("Iframe with ashdi.vip not found.")
+        # await browser.close()
         return None
 
 
