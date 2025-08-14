@@ -1,11 +1,11 @@
 from utils import logger
 
 async def user_survey(browser, page):
-    try:
             step_index = 0
 
             while True:
                 containers = await page.query_selector_all(".playlists-items")
+                print(f"Containers found: {len(containers)}")
                 if not containers:
                     logger("No .playlists-items found on the page.")
                     return None
@@ -13,9 +13,13 @@ async def user_survey(browser, page):
                 if step_index < 0:
                     logger("Backtracked past first step — aborting.")
                     return None
-                if step_index >= len(containers):
-                    logger("Ran out of steps without finding ASHDI.")
-                    return None
+                
+                if step_index == 4:
+                    iframe_element = await page.query_selector("iframe[src*='ashdi.vip']")
+                    if iframe_element:
+                            src = await iframe_element.get_attribute("src")
+                            logger(f"Found iframe with src: {src}")
+                            return src
 
                 container = containers[step_index]
                 li_handles = await container.query_selector_all("li")
@@ -39,7 +43,7 @@ async def user_survey(browser, page):
                     print("There are not any options here")
                     return None
 
-                if step_index == len(containers) - 1:
+                if step_index == 2:
                     ashdi_idx = None
                     for j, (_, info) in enumerate(options):
                         print('info["text"]', info["text"])
@@ -55,15 +59,7 @@ async def user_survey(browser, page):
                         await ashdi_handle.click()
                         await page.wait_for_timeout(500)
 
-                        iframe_element = await page.query_selector("iframe[src*='ashdi.vip']")
-                        if iframe_element:
-                            src = await iframe_element.get_attribute("src")
-                            logger(f"Found iframe with src: {src}")
-                            return src
-
-                        print(
-                            "ASHDI player selected, but iframe did not appear — going back a step.")
-                        step_index = max(step_index - 1, 0)
+                        step_index += 1
                         continue
                     else:
                         print(
@@ -75,6 +71,8 @@ async def user_survey(browser, page):
                     prompt = "Choose subtitles or voice Enter 1 or 2:"
                 elif step_index == 1:
                     prompt = "Choose actor Enter 1 or 2:"
+                elif step_index == 3:
+                    prompt = "Choose episode number:"
                 else:
                     prompt = f"Choose option for step {step_index + 1} Enter number:"
 
@@ -98,8 +96,8 @@ async def user_survey(browser, page):
                 await page.wait_for_timeout(500)
                 step_index += 1
 
-    finally:
-        await browser.close()
-        logger("Browser closed (get_player_url).")
-        logger("ASHDI iframe not found.")
-        return None
+    # finally:
+    #     await browser.close()
+    #     logger("Browser closed (get_player_url).")
+    #     logger("ASHDI iframe not found.")
+    #     return None

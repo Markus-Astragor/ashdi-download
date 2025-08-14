@@ -15,16 +15,6 @@ from playwright.async_api import async_playwright
 from download_survey import user_survey
 from utils import logger, set_debug
 
-# DEBUG_ENABLED = False
-
-# def set_debug(enabled: bool) -> None:
-#     global DEBUG_ENABLED
-#     DEBUG_ENABLED = enabled
-
-# def logger(message: str) -> None:
-#     if DEBUG_ENABLED:
-#         print(message)
-
 @click.command()
 @optgroup.group(cls=RequiredMutuallyExclusiveOptionGroup)
 @optgroup.option("-e", "--episode", metavar="URL", multiple=True)
@@ -80,23 +70,15 @@ async def get_player_url(url: str, *, session: ClientSession = None) -> str | No
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
 
-        await page.goto(url, wait_until="networkidle")
-
-        # html = await page.content()
-        # elements = await page.query_selector_all(".playlists-items")
+        await page.goto(url, wait_until="domcontentloaded", timeout=60_000)
+        await page.wait_for_selector(".playlists-items", timeout=30_000)
         
-        await user_survey(browser, page)
+        src = await user_survey(browser, page)
 
-
-        # iframe_element = await page.query_selector("iframe[src*='ashdi.vip']")
-        # if iframe_element:
-        #     src = await iframe_element.get_attribute("src")
-        #     logger(f"Found iframe with src: {src}")
-        #     await browser.close()
-        #     return src
-
-        # logger("Iframe with ashdi.vip not found.")
-        # await browser.close()
+        if src:
+            logger(f"Found ASHDI iframe src: {src}")
+            return src
+        
         return None
 
 
