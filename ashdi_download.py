@@ -73,7 +73,7 @@ async def get_player_url(url: str, *, session: ClientSession = None) -> str | No
         await page.goto(url, wait_until="domcontentloaded", timeout=60_000)
         await page.wait_for_selector(".playlists-items", timeout=30_000)
         
-        src = await user_survey(browser, page)
+        src = await user_survey(page)
 
         if src:
             logger(f"Found ASHDI iframe src: {src}")
@@ -152,6 +152,6 @@ async def download_season(
         download_episode, urls, quality, output_format, session=session
     )
 
-
 if __name__ == "__main__":
     cli()
+    
